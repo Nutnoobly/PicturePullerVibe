@@ -4,7 +4,8 @@ init-hook='import sys; sys.path.insert(0, "src")'
 [MESSAGES CONTROL]
 disable=
     import-error,
-    too-few-public-methods
+    too-few-public-methods,
+    unknown-option-value
 
 [FORMAT]
 max-line-length=100

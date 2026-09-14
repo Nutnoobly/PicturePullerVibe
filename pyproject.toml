@@ -29,6 +29,7 @@ init-hook = "import sys; sys.path.insert(0, 'src')"
 disable = [
     "import-error",
     "too-few-public-methods",
+    "unknown-option-value",
 ]
 
 [tool.pylint.format]

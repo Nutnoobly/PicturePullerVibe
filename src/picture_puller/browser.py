@@ -208,8 +208,9 @@ async def launch_resilient_browser(
     raise RuntimeError(f"Could not launch browser on {os_name.capitalize()}: {last_error}")
 
 
-async def extract_series_with_browser(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
+async def extract_series_with_browser(  # pylint: disable=too-many-arguments,too-many-locals
     url: str,
+    *,
     custom_script_path: Optional[str] = None,
     headed: bool = False,
     channel: Optional[str] = None,

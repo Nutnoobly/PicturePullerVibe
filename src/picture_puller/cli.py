@@ -83,7 +83,8 @@ def _render_summary_table(results: List[DownloadResult], output_dir: Path) -> No
 
 
 @app.command(name="pull")
-def pull(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
+def pull(  # pylint: disable=too-many-arguments,too-many-locals
+    *,
     url: str = typer.Option(
         "https://www.iq.com/?lang=en_th",
         "--url", "-u",
