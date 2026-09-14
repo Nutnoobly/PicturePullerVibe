@@ -73,9 +73,9 @@ python3 -m venv .venv
 # On Linux / macOS:
 source .venv/bin/activate
 # On Windows (PowerShell):
-# .venv\bin\Activate.ps1
+# .\.venv\bin\Activate.ps1
 # On Windows (cmd):
-# .venv\bin\activate.bat
+# .\.venv\bin\activate.bat
 
 # Install Python requirements
 pip install -r requirements.txt
