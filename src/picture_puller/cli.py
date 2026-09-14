@@ -3,6 +3,7 @@ Command-line interface handlers for Picture Puller Vibe.
 Provides Typer commands and Rich terminal interfaces for image pulling.
 """
 
+# pylint: disable=import-error
 import asyncio
 from pathlib import Path
 from typing import Optional, List

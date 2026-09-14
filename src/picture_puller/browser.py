@@ -3,6 +3,7 @@ Playwright browser automation and in-browser script injection module.
 Provides resilient multi-OS browser launching and series data extraction.
 """
 
+# pylint: disable=import-error
 import os
 import shutil
 import platform

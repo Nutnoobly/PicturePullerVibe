@@ -21,3 +21,15 @@ picture-puller = "picture_puller.cli:app"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.pylint.main]
+init-hook = "import sys; sys.path.insert(0, 'src')"
+
+[tool.pylint.messages_control]
+disable = [
+    "import-error",
+    "too-few-public-methods",
+]
+
+[tool.pylint.format]
+max-line-length = 100

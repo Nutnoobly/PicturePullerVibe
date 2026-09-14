@@ -2,6 +2,7 @@
 Pydantic data models representing extracted series items and download results.
 """
 
+# pylint: disable=import-error,too-few-public-methods
 from typing import List, Optional
 from pydantic import BaseModel, Field
 

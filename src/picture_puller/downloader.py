@@ -3,6 +3,7 @@ Asynchronous image downloader and directory organizer.
 Streams layered assets concurrently and saves structured metadata.
 """
 
+# pylint: disable=import-error
 import json
 from pathlib import Path
 from typing import List, Tuple
