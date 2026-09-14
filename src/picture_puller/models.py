@@ -1,8 +1,15 @@
+"""
+Pydantic data models representing extracted series items and download results.
+"""
+
 from typing import List, Optional
 from pydantic import BaseModel, Field
 
 
 class SeriesItem(BaseModel):
+    """
+    Represents a single carousel series with its metadata and layered image URLs.
+    """
     index: int = Field(default=1, description="1-based index in the carousel order")
     title: str = Field(..., description="Series title")
     bg_url: Optional[str] = Field(None, description="Background image URL")
@@ -17,6 +24,9 @@ class SeriesItem(BaseModel):
 
 
 class DownloadResult(BaseModel):
+    """
+    Represents the output filesystem paths and layer status for a downloaded series.
+    """
     series_title: str
     folder_path: str
     bg_path: Optional[str] = None

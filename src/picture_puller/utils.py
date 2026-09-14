@@ -1,6 +1,9 @@
+"""
+Utility functions for filename sanitization, extension inference, and folder naming.
+"""
+
 import re
 from urllib.parse import urlparse
-from pathlib import Path
 
 
 def sanitize_filename(name: str, max_length: int = 80) -> str:

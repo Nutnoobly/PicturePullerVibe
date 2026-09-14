@@ -1,7 +1,11 @@
+"""
+Asynchronous image downloader and directory organizer.
+Streams layered assets concurrently and saves structured metadata.
+"""
+
 import json
-import asyncio
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Tuple
 import httpx
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn, TimeRemainingColumn
@@ -35,85 +39,60 @@ async def download_file(
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_bytes(response.content)
         return True
-    except Exception as e:
+    except (httpx.HTTPError, OSError) as e:
         console.print(f"[red]Error downloading {url}: {e}[/red]")
         return False
 
 
-async def download_series_assets(
-    client: httpx.AsyncClient,
+def _build_layer_tasks(
     series: SeriesItem,
-    output_dir: Path
-) -> DownloadResult:
+    series_dir: Path
+) -> Tuple[List[Tuple[str, str, Path]], List[str]]:
     """
-    Downloads all 3 layers (bg, character, logo) for a single series and saves metadata.json.
-    Creates folder structure:
-      <output_dir>/<01_title>/
-        ├── bg/bg.<ext>
-        ├── character/character.<ext>
-        ├── logo/logo.<ext>
-        └── metadata.json
+    Constructs the download tasks and detects any missing layers for a series.
     """
-    folder_name = format_series_folder_name(series.index, series.title)
-    series_dir = output_dir / folder_name
-    series_dir.mkdir(parents=True, exist_ok=True)
-
-    bg_dir = series_dir / "bg"
-    char_dir = series_dir / "character"
-    logo_dir = series_dir / "logo"
-
-    bg_dir.mkdir(parents=True, exist_ok=True)
-    char_dir.mkdir(parents=True, exist_ok=True)
-    logo_dir.mkdir(parents=True, exist_ok=True)
-
-    result = DownloadResult(
-        series_title=series.title,
-        folder_path=str(series_dir)
-    )
-
-    tasks = []
+    tasks: List[Tuple[str, str, Path]] = []
+    missing_layers: List[str] = []
 
     # 1. Background image
     if series.bg_url:
         bg_ext = get_extension_from_url(series.bg_url, default=".webp")
-        bg_dest = bg_dir / f"bg{bg_ext}"
+        bg_dest = series_dir / "bg" / f"bg{bg_ext}"
         tasks.append(("bg", series.bg_url, bg_dest))
     else:
-        result.missing_layers.append("bg")
-        console.print(f"[yellow]⚠️  [{series.title}] Missing background layer (bg_url)[/yellow]")
+        missing_layers.append("bg")
+        console.print(f"[yellow]⚠️  [{series.title}] Missing background layer[/yellow]")
 
     # 2. Character focus image
     if series.character_url:
         char_ext = get_extension_from_url(series.character_url, default=".webp")
-        char_dest = char_dir / f"character{char_ext}"
+        char_dest = series_dir / "character" / f"character{char_ext}"
         tasks.append(("character", series.character_url, char_dest))
     else:
-        result.missing_layers.append("character")
-        console.print(f"[yellow]⚠️  [{series.title}] Missing character focus layer (character_url)[/yellow]")
+        missing_layers.append("character")
+        console.print(f"[yellow]⚠️  [{series.title}] Missing character focus layer[/yellow]")
 
     # 3. Logo image
     if series.logo_url:
         logo_ext = get_extension_from_url(series.logo_url, default=".png")
-        logo_dest = logo_dir / f"logo{logo_ext}"
+        logo_dest = series_dir / "logo" / f"logo{logo_ext}"
         tasks.append(("logo", series.logo_url, logo_dest))
     else:
-        result.missing_layers.append("logo")
-        console.print(f"[yellow]⚠️  [{series.title}] Missing series logo layer (logo_url)[/yellow]")
+        missing_layers.append("logo")
+        console.print(f"[yellow]⚠️  [{series.title}] Missing series logo layer[/yellow]")
 
-    # Execute downloads concurrently for this series
-    for layer_type, url, dest in tasks:
-        success = await download_file(client, url, dest)
-        if success:
-            if layer_type == "bg":
-                result.bg_path = str(dest)
-            elif layer_type == "character":
-                result.character_path = str(dest)
-            elif layer_type == "logo":
-                result.logo_path = str(dest)
-        else:
-            result.missing_layers.append(layer_type)
+    return tasks, missing_layers
 
-    # 4. Save metadata.json
+
+def _save_metadata(
+    series: SeriesItem,
+    series_dir: Path,
+    saved_files: dict,
+    missing_layers: List[str]
+) -> str:
+    """
+    Saves structured series metadata and original CDN URLs to metadata.json.
+    """
     metadata = {
         "index": series.index,
         "title": series.title,
@@ -128,19 +107,48 @@ async def download_series_assets(
             "character": series.character_url,
             "logo": series.logo_url
         },
-        "saved_files": {
-            "bg": result.bg_path,
-            "character": result.character_path,
-            "logo": result.logo_path
-        },
-        "missing_layers": result.missing_layers
+        "saved_files": saved_files,
+        "missing_layers": missing_layers
     }
-
     meta_file = series_dir / "metadata.json"
     meta_file.write_text(json.dumps(metadata, indent=2, ensure_ascii=False), encoding="utf-8")
-    result.metadata_path = str(meta_file)
+    return str(meta_file)
 
-    return result
+
+async def download_series_assets(
+    client: httpx.AsyncClient,
+    series: SeriesItem,
+    output_dir: Path
+) -> DownloadResult:
+    """
+    Downloads all 3 layers (bg, character, logo) for a single series and saves metadata.json.
+    """
+    folder_name = format_series_folder_name(series.index, series.title)
+    series_dir = output_dir / folder_name
+    series_dir.mkdir(parents=True, exist_ok=True)
+
+    tasks, missing_layers = _build_layer_tasks(series, series_dir)
+    failed_layers = list(missing_layers)
+    saved_paths = {"bg": None, "character": None, "logo": None}
+
+    for layer_type, url, dest in tasks:
+        success = await download_file(client, url, dest)
+        if success:
+            saved_paths[layer_type] = str(dest)
+        else:
+            failed_layers.append(layer_type)
+
+    meta_path = _save_metadata(series, series_dir, saved_paths, failed_layers)
+
+    return DownloadResult(
+        series_title=series.title,
+        folder_path=str(series_dir),
+        bg_path=saved_paths["bg"],
+        character_path=saved_paths["character"],
+        logo_path=saved_paths["logo"],
+        metadata_path=meta_path,
+        missing_layers=failed_layers
+    )
 
 
 async def download_all_series(
@@ -162,10 +170,11 @@ async def download_all_series(
             TimeRemainingColumn(),
             console=console
         ) as progress:
-            task = progress.add_task("[green]Downloading series assets...", total=len(series_list))
-            
+            task = progress.add_task("[green]Downloading series...", total=len(series_list))
+
             for item in series_list:
-                progress.update(task, description=f"[green]Downloading:[/green] [bold]{item.title}[/bold]")
+                status_desc = f"[green]Downloading:[/green] [bold]{item.title}[/bold]"
+                progress.update(task, description=status_desc)
                 res = await download_series_assets(client, item, output_dir)
                 results.append(res)
                 progress.advance(task)
